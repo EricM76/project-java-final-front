@@ -43,7 +43,7 @@ export const Detail = () => {
         <div className="alert alert-info">Cargando....</div>
       ) : (
         <>
-          <FormProduct handleClose={handleCloseModal} show={show} />
+          <FormProduct handleClose={handleCloseModal} show={show} productToEdit={data} />
           <div className="row">
             <div className="col-12">
               <h2 className="products-title">

@@ -6,13 +6,28 @@ import type { Category } from "../interfaces/Category";
 import type { Section } from "../interfaces/Section";
 import type { Brand } from "../interfaces/Brand";
 import { UseFetchWithoutToken } from "../hooks/useFetch";
+import type { Product } from "../interfaces/Product";
 
 interface IProps {
   handleClose: () => void;
   show: boolean;
+  productToEdit?: Product;
 }
 
-const FormProduct = ({ handleClose, show }: IProps) => {
+const FormProduct = ({ handleClose, show, productToEdit }: IProps) => {
+  const initialFormData = {
+    name: "",
+    price: "",
+    discount: "",
+    sectionId: "",
+    brandId: "",
+    categoryId: "",
+    description: "",
+    image: "",
+  };
+
+  const [formData, setFormData] = useState(initialFormData);
+  const [imagePreview, setImagePreview] = useState<string>("");
   const [isLoading, setIsLoading] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
   const [sections, setSections] = useState<Section[]>([]);
@@ -25,6 +40,8 @@ const FormProduct = ({ handleClose, show }: IProps) => {
     setSections([]);
     setBrands([]);
     setErrors({});
+    setFormData(initialFormData);
+    setImagePreview("");
   }, []);
 
   const getCategories = useCallback(async () => {
@@ -65,37 +82,36 @@ const FormProduct = ({ handleClose, show }: IProps) => {
   }, [getCategories, getSections, getBrands]);
 
   useEffect(() => {
-    if (!show) {
+    console.log(productToEdit);
+    if (show) {
+      if (productToEdit) {
+        
+        setFormData({
+          name: productToEdit.name,
+          price: String(productToEdit.price), // Convertir a string si es necesario para el input type="number"
+          discount: String(productToEdit.discount || "0"),
+          sectionId: String(productToEdit.section.id),
+          brandId: String(productToEdit.brand.id),
+          categoryId: String(productToEdit.category.id),
+          description: productToEdit.description,
+          image: productToEdit.image, // Aquí podrías pasar la URL de la imagen si ya la tienes
+        });
+        setImagePreview(productToEdit.image); // Mostrar la imagen actual del producto
+      } else {
+        // Si no hay producto para editar, resetear el formulario (modo creación)
+        setFormData(initialFormData);
+        setImagePreview("");
+      }
+    } else {
       resetFormStates();
     }
-  }, [show, resetFormStates]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [show, productToEdit, resetFormStates]);
 
-    const onCloseModal = () => {
+  const onCloseModal = () => {
     handleClose(); // Llama a la función handleClose pasada por el padre
     // Los estados se resetearán automáticamente por el `useEffect` cuando `show` cambie a `false`
   };
-
-    const [formData, setFormData] = useState<{
-    name: string;
-    price: string;
-    discount: string;
-    sectionId: string;
-    brandId: string;
-    categoryId: string;
-    subcategoryId: string;
-    description: string;
-    image: File | string;
-  }>({
-    name: "",
-    price: "",
-    discount: "",
-    sectionId: "",
-    brandId: "",
-    categoryId: "",
-    subcategoryId: "",
-    description: "",
-    image: "",
-  });
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
@@ -140,8 +156,6 @@ const FormProduct = ({ handleClose, show }: IProps) => {
     }));
   };
 
-  const [imagePreview, setImagePreview] = useState<string>("");
-
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
 
@@ -164,7 +178,7 @@ const FormProduct = ({ handleClose, show }: IProps) => {
         setImagePreview(reader.result as string);
         setFormData((prev) => ({
           ...prev,
-          image: file,
+          image: reader.result as string,
         }));
       };
       reader.readAsDataURL(file);
