@@ -1,16 +1,16 @@
 const baseURL = import.meta.env.VITE_API_URL_BASE;
 
 export const UseFetchWithoutToken = async (endpoint: string, method = "GET", data: unknown) => {
-    const url = `${baseURL}/${endpoint}`;
+    const url = `${baseURL}/${endpoint}`;    
     let response;
 
-    if (method === "GET") {
+    if (method === "GET" || method === "DELETE") {
         response = await fetch(url, {
             method,
         });
     }
 
-    if (method === "POST") {
+    if (method === "POST" || method === "PUT") {
         response = await fetch(url, {
             method,
             body: JSON.stringify(data),

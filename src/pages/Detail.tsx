@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { toThousand } from "../helpers";
 import { UseFetchWithoutToken } from "../hooks/useFetch";
 import type { Product } from "../interfaces/Product";
@@ -7,6 +7,7 @@ import FormProduct from "../components/FormProduct";
 
 export const Detail = () => {
   const { id: idProduct } = useParams();
+  const navigate = useNavigate();
 
   const [product, setProduct] = useState({
     loading: false,
@@ -20,8 +21,6 @@ export const Detail = () => {
         "GET",
         null
       );
-      console.log(result);
-
       setProduct({
         loading: true,
         data: result,
@@ -37,13 +36,37 @@ export const Detail = () => {
   const handleOpenModal = () => setShow(true);
   const handleCloseModal = () => setShow(false);
 
+  const handleUpdatedDataProduct = (data: Product) => {
+    setProduct({
+      ...product,
+      data: {
+        ...product.data,
+        ...data,
+      },
+    });
+  };
+
+  const handleDeleteProduct = async () => {
+    try {
+      await UseFetchWithoutToken(`products/${idProduct}`, "DELETE", null);
+      navigate("/products");
+    } catch (error) {
+      console.error(error); 
+    }
+  };
+
   return (
     <div className="container products-wrapper">
       {!loading ? (
         <div className="alert alert-info">Cargando....</div>
       ) : (
         <>
-          <FormProduct handleClose={handleCloseModal} show={show} productToEdit={data} />
+          <FormProduct
+            handleClose={handleCloseModal}
+            show={show}
+            productToEdit={data}
+            handleUpdatedDataProduct={handleUpdatedDataProduct}
+          />
           <div className="row">
             <div className="col-12">
               <h2 className="products-title">
@@ -91,30 +114,25 @@ export const Detail = () => {
                       <p>Retiro gratis en locales del vendedor</p>
                     </li>
                   </ul>
-                   <button className="btn btn-primary mb-3" style={{width:'100%'}}>
-                      AGREGAR AL CARRITO
-                    </button>
-                  <div >
-                    <form
-                      action={`/products/delete/${data.id}?_method=DELETE`}
-                      method="POST"
-                      className="d-flex flex-column flex-wrap gap-2"
-                    >
-                        <a
-                      href="#"
+                  <button
+                    className="btn btn-primary mb-3"
+                    style={{ width: "100%" }}
+                  >
+                    AGREGAR AL CARRITO
+                  </button>
+                  <div className="d-flex flex-column flex-wrap gap-3">
+                    <button
                       className="btn btn-success"
                       onClick={handleOpenModal}
                     >
                       EDITAR PRODUCTO
-                    </a>
-                      <button
-                        type="submit"
-                        style={{ cursor: "pointer;" }}
-                        className="btn btn-danger"
-                      >
-                        ELIMINAR
-                      </button>
-                    </form>
+                    </button>
+                    <button
+                      className="btn btn-danger"
+                      onClick={handleDeleteProduct}
+                    >
+                      BORRAR PRODUCTO
+                    </button>
                   </div>
                 </article>
               </div>

@@ -7,21 +7,42 @@ import type { Section } from "../interfaces/Section";
 import type { Brand } from "../interfaces/Brand";
 import { UseFetchWithoutToken } from "../hooks/useFetch";
 import type { Product } from "../interfaces/Product";
+import { useNavigate, useParams } from "react-router-dom";
 
 interface IProps {
   handleClose: () => void;
   show: boolean;
   productToEdit?: Product;
+  handleUpdatedDataProduct: (data: Product) => void;
 }
 
-const FormProduct = ({ handleClose, show, productToEdit }: IProps) => {
-  const initialFormData = {
+interface IFormData {
+  name: string;
+  price: string;
+  discount: string;
+  section: number | string;
+  brand: number | string;
+  category: number | string;
+  description: string;
+  image: File | string;
+}
+
+const FormProduct = ({
+  handleClose,
+  show,
+  productToEdit,
+  handleUpdatedDataProduct,
+}: IProps) => {
+  const { id: idProduct } = useParams();
+  const navigate = useNavigate();
+
+  const initialFormData: IFormData = {
     name: "",
     price: "",
     discount: "",
-    sectionId: "",
-    brandId: "",
-    categoryId: "",
+    section: "",
+    brand: "",
+    category: "",
     description: "",
     image: "",
   };
@@ -36,10 +57,6 @@ const FormProduct = ({ handleClose, show, productToEdit }: IProps) => {
 
   const resetFormStates = useCallback(() => {
     setIsLoading(false);
-    setCategories([]);
-    setSections([]);
-    setBrands([]);
-    setErrors({});
     setFormData(initialFormData);
     setImagePreview("");
   }, []);
@@ -82,17 +99,15 @@ const FormProduct = ({ handleClose, show, productToEdit }: IProps) => {
   }, [getCategories, getSections, getBrands]);
 
   useEffect(() => {
-    console.log(productToEdit);
     if (show) {
       if (productToEdit) {
-        
         setFormData({
           name: productToEdit.name,
           price: String(productToEdit.price), // Convertir a string si es necesario para el input type="number"
           discount: String(productToEdit.discount || "0"),
-          sectionId: String(productToEdit.section.id),
-          brandId: String(productToEdit.brand.id),
-          categoryId: String(productToEdit.category.id),
+          section: productToEdit.section?.id,
+          brand: productToEdit?.brand?.id,
+          category: productToEdit?.category?.id,
           description: productToEdit.description,
           image: productToEdit.image, // Aquí podrías pasar la URL de la imagen si ya la tienes
         });
@@ -105,7 +120,7 @@ const FormProduct = ({ handleClose, show, productToEdit }: IProps) => {
     } else {
       resetFormStates();
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [show, productToEdit, resetFormStates]);
 
   const onCloseModal = () => {
@@ -124,16 +139,16 @@ const FormProduct = ({ handleClose, show, productToEdit }: IProps) => {
       newErrors.price = "El precio debe ser mayor a 0";
     }
 
-    if (!formData.sectionId) {
-      newErrors.sectionId = "Debe seleccionar una sección";
+    if (!formData.section) {
+      newErrors.section = "Debe seleccionar una sección";
     }
 
-    if (!formData.brandId) {
-      newErrors.brandId = "Debe seleccionar una marca";
+    if (!formData.brand) {
+      newErrors.brand = "Debe seleccionar una marca";
     }
 
-    if (!formData.categoryId) {
-      newErrors.categoryId = "Debe seleccionar una categoría";
+    if (!formData.category) {
+      newErrors.category = "Debe seleccionar una categoría";
     }
 
     if (!formData.description.trim()) {
@@ -150,6 +165,7 @@ const FormProduct = ({ handleClose, show, productToEdit }: IProps) => {
     >
   ) => {
     const { name, value } = e.target;
+
     setFormData((prev) => ({
       ...prev,
       [name]: value,
@@ -176,10 +192,10 @@ const FormProduct = ({ handleClose, show, productToEdit }: IProps) => {
       const reader = new FileReader();
       reader.onloadend = () => {
         setImagePreview(reader.result as string);
-        setFormData((prev) => ({
-          ...prev,
-          image: reader.result as string,
-        }));
+        setFormData({
+          ...formData,
+          image: file,
+        });
       };
       reader.readAsDataURL(file);
     }
@@ -189,41 +205,60 @@ const FormProduct = ({ handleClose, show, productToEdit }: IProps) => {
     e.preventDefault();
 
     if (!validateForm()) {
-      console.log(errors);
-      // Aquí podrías agregar alguna notificación de error
+      // todo: Aquí podrías agregar alguna notificación de error
       return;
     }
 
     setIsLoading(true);
 
     try {
-      // Crear FormData para enviar la imagen
-      const formDataToSend = new FormData();
-      formDataToSend.append("name", formData.name);
-      formDataToSend.append("price", formData.price);
-      formDataToSend.append("discount", formData.discount || "0");
-      formDataToSend.append("sectionId", formData.sectionId);
-      formDataToSend.append("brandId", formData.brandId);
-      formDataToSend.append("categoryId", formData.categoryId);
-      formDataToSend.append("description", formData.description);
-      if (formData.image) {
-        formDataToSend.append("image", formData.image);
+      if (formData.image instanceof File) {
+        const imageToSend = new FormData();
+        imageToSend.append("image", formData.image);
+        const response = await fetch(
+          `https://api.imgbb.com/1/upload?expiration=600&key=${
+            import.meta.env.VITE_API_KEY_IMGBB
+          }`,
+          {
+            method: "POST",
+            body: imageToSend,
+          }
+        );
+        const result = await response.json();
+        if (result.success) {
+          console.log("Imagen subida con éxito:", result.data.url);
+          formData.image = result.data.url;
+        } else {
+          console.error("Error al subir la imagen:", result.error.message);
+        }
       }
 
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/products`, {
-        method: "POST",
-        body: formDataToSend, // Ya no enviamos headers porque FormData los establece automáticamente
-      });
+      const data = {
+        ...formData,
+        section: { id: formData.section },
+        brand: { id: formData.brand },
+        category: { id: formData.category },
+      };
 
-      const result = await response.json();
+      const response: Product = productToEdit
+        ? await UseFetchWithoutToken(`products/${idProduct}`, "PUT", data)
+        : await UseFetchWithoutToken(`products`, "POST", data);
 
-      if (result.success) {
+      if (response) {
+        if(productToEdit){
+          handleUpdatedDataProduct(response) 
+        }else {
+          navigate('/products/detail/' + response.id)
+        }
         onCloseModal();
-        // Aquí podrías agregar alguna notificación de éxito
+        // Todo: Aquí podrías agregar alguna notificación de éxito
       } else {
         alert("Error al crear el producto");
       }
+      onCloseModal();
     } catch (error: unknown) {
+      console.log(error);
+
       alert(
         error instanceof Error ? error.message : "Error al crear el producto"
       );
@@ -283,10 +318,10 @@ const FormProduct = ({ handleClose, show, productToEdit }: IProps) => {
             <Form.Label>Sección:</Form.Label>
             <Form.Select
               size="lg"
-              name="sectionId"
-              value={formData.sectionId}
+              name="section"
+              value={formData.section}
               onChange={handleInputChange}
-              isInvalid={!!errors.sectionId}
+              isInvalid={!!errors.section}
             >
               <option value="" hidden>
                 Elegí la sección
@@ -298,7 +333,7 @@ const FormProduct = ({ handleClose, show, productToEdit }: IProps) => {
               ))}
             </Form.Select>
             <Form.Control.Feedback type="invalid">
-              {errors.sectionId}
+              {errors.section}
             </Form.Control.Feedback>
           </Form.Group>
 
@@ -306,10 +341,10 @@ const FormProduct = ({ handleClose, show, productToEdit }: IProps) => {
             <Form.Label>Marca:</Form.Label>
             <Form.Select
               size="lg"
-              name="brandId"
-              value={formData.brandId}
+              name="brand"
+              value={formData.brand}
               onChange={handleInputChange}
-              isInvalid={!!errors.brandId}
+              isInvalid={!!errors.brand}
             >
               <option value="" hidden>
                 Elegí la marca
@@ -320,15 +355,18 @@ const FormProduct = ({ handleClose, show, productToEdit }: IProps) => {
                 </option>
               ))}
             </Form.Select>
+            <Form.Control.Feedback type="invalid">
+              {errors.brand}
+            </Form.Control.Feedback>
           </Form.Group>
 
           <Form.Group className="col-12 col-md-4 col-lg-4 mb-3">
             <Form.Label>Categoría:</Form.Label>
             <Form.Select
               size="lg"
-              name="categoryId"
-              value={formData.categoryId}
-              isInvalid={!!errors.categoryId}
+              name="category"
+              value={formData.category}
+              isInvalid={!!errors.category}
               onChange={handleInputChange}
             >
               <option value="" hidden>
@@ -340,6 +378,9 @@ const FormProduct = ({ handleClose, show, productToEdit }: IProps) => {
                 </option>
               ))}
             </Form.Select>
+            <Form.Control.Feedback type="invalid">
+              {errors.category}
+            </Form.Control.Feedback>
           </Form.Group>
 
           <Form.Group className="col-12 col-md-6 mb-3">
@@ -367,6 +408,9 @@ const FormProduct = ({ handleClose, show, productToEdit }: IProps) => {
                 {errors.image}
               </Form.Control.Feedback>
             </Form.Group>
+            <Form.Control.Feedback type="invalid">
+              {errors.image}
+            </Form.Control.Feedback>
           </Form.Group>
           <Form.Group className="col-12 col-md-6 mb-3">
             <Form.Label>Imagen:</Form.Label>
